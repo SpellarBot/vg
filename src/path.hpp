@@ -54,7 +54,7 @@ public:
     }
     // move constructor
     Paths(Paths&& other) noexcept {
-        _paths = other._paths;
+        _paths = std::move(other._paths);
         other.clear();
         rebuild_node_mapping();
     }
@@ -84,7 +84,7 @@ public:
     // for its path and the id of the path.
     // The list in question is stored above in _paths.
     // Recall that std::list iterators are bidirectional.
-    hash_map<mapping_t*, pair<list<mapping_t>::iterator, int64_t> > mapping_itr;
+    hash_map<const mapping_t*, pair<list<mapping_t>::iterator, int64_t> > mapping_itr;
     // This maps from mapping_t* pointer to the name of the path it belongs to
     // (which can then be used to get the list its iterator belongs to).
     void sort_by_mapping_rank(void);
@@ -205,10 +205,11 @@ public:
     void prepend_mapping(const string& name, const Mapping& m, bool warn_on_duplicates = false);
     void prepend_mapping(const string& name, id_t id, bool is_reverse, size_t length, size_t rank, bool warn_on_duplicates = false);
     size_t get_next_rank(const string& name);
-    void append(const Paths& p, bool warn_on_duplicates = false);
-    void append(const Graph& g, bool warn_on_duplicates = false);
-    void extend(const Paths& p, bool warn_on_duplicates = false);
-    void extend(const Path& p, bool warn_on_duplicates = false);
+    void append(const Paths& paths, bool warn_on_duplicates = false, bool rebuild_indexes = true);
+    void append(const Graph& g, bool warn_on_duplicates = false, bool rebuild_indexes = true);
+    void extend(const Paths& paths, bool warn_on_duplicates = false, bool rebuild_indexes = true);
+    void extend(const Path& p, bool warn_on_duplicates = false, bool rebuild_indexes = true);
+    void extend(const vector<Path> & paths, bool warn_on_duplicates = false, bool rebuild_indexes = true);
     void for_each(const function<void(const Path&)>& lambda);
     // Loop over the names of paths without actually extracting the Path objects.
     void for_each_name(const function<void(const string&)>& lambda);

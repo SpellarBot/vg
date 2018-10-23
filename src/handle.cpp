@@ -13,6 +13,15 @@ handle_t HandleGraph::get_handle(const Visit& visit) const {
     return get_handle(visit.node_id(), visit.backward());
 }
 
+size_t HandleGraph::get_degree(const handle_t& handle, bool go_left) const {
+    size_t count = 0;
+    follow_edges(handle, go_left, [&](const handle_t& ignored) {
+        // Just manually count every edge we get by looking at the handle in that orientation
+        count++;
+    });
+    return count;
+}
+
 Visit HandleGraph::to_visit(const handle_t& handle) const {
     return vg::to_visit(this->get_id(handle), this->get_is_reverse(handle));
 }
@@ -42,6 +51,22 @@ pair<handle_t, handle_t> HandleGraph::edge_handle(const handle_t& left, const ha
     } else {
         // We're smaller
         return make_pair(left, right);
+    }
+}
+
+handle_t HandleGraph::traverse_edge_handle(const edge_t& edge, const handle_t& left) const {
+    if (left == edge.first) {
+        // The cannonical orientation is the one we want
+        return edge.second;
+    } else if (left == this->flip(edge.second)) {
+        // We really want the other orientation
+        return this->flip(edge.first);
+    } else {
+        // This isn't either handle that the edge actually connects. Something has gone wrong.
+        throw runtime_error("Cannot view edge " +
+            to_string(this->get_id(edge.first)) + " " + to_string(this->get_is_reverse(edge.first)) + " -> " +
+            to_string(this->get_id(edge.second)) + " " + to_string(this->get_is_reverse(edge.second)) +
+            " from non-participant " + to_string(this->get_id(left)) + " " + to_string(this->get_is_reverse(left)));
     }
 }
 
