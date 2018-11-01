@@ -43,6 +43,7 @@ void help_index(char** argv) {
          << "    -F, --thread-db FILE   read thread database from FILE (may repeat)" << endl
          << "gbwt options:" << endl
          << "    -v, --vcf-phasing FILE generate threads from the haplotypes in the VCF file FILE" << endl
+         << "    -W, --ignore-missing   don't warn when variants in the VCF are missing from the graph; silently skip them" << endl
          << "    -e, --parse-only FILE  store the VCF parsing with prefix FILE without generating threads" << endl
          << "    -T, --store-threads    generate threads from the embedded paths" << endl
          << "    -M, --store-gam FILE   generate threads from the alignments in FILE (many allowed)" << endl
@@ -107,6 +108,11 @@ gbwt::vector_type predecessors(const xg::XG& xg_index, const Path& path) {
 
     vg::id_t first_node = path.mapping(0).position().node_id();
     bool is_reverse = path.mapping(0).position().is_reverse();
+    
+#ifdef debug
+    cerr << "Look for predecessors of node " << first_node << " " << is_reverse << " which is first in alt path" << endl;
+#endif
+    
     auto pred_edges = (is_reverse ? xg_index.edges_on_end(first_node) : xg_index.edges_on_start(first_node));
     for (auto& edge : pred_edges) {
         if (edge.from() == edge.to()) {
@@ -151,6 +157,7 @@ int main_index(int argc, char** argv) {
     bool show_progress = false;
 
     // GBWT
+    bool warn_on_missing_variants = true;
     bool index_haplotypes = false, index_paths = false, index_gam = false;
     bool parse_only = false;
     vector<string> gam_file_names;
@@ -197,6 +204,7 @@ int main_index(int argc, char** argv) {
 
             // GBWT
             {"vcf-phasing", required_argument, 0, 'v'},
+            {"ignore-missing", no_argument, 0, 'W'},
             {"parse-only", required_argument, 0, 'e'},
             {"store-threads", no_argument, 0, 'T'},
             {"store-gam", required_argument, 0, 'M'},
@@ -241,7 +249,7 @@ int main_index(int argc, char** argv) {
         };
 
         int option_index = 0;
-        c = getopt_long (argc, argv, "b:t:px:F:v:e:TM:G:H:PoB:u:n:R:r:I:E:g:i:f:k:X:Z:Vld:maANDCc:s:j:h",
+        c = getopt_long (argc, argv, "b:t:px:F:v:We:TM:G:H:PoB:u:n:R:r:I:E:g:i:f:k:X:Z:Vld:maANDCc:s:j:h",
                 long_options, &option_index);
 
         // Detect the end of the options.
@@ -275,6 +283,9 @@ int main_index(int argc, char** argv) {
             index_haplotypes = true;
             build_xg = true;
             vcf_name = optarg;
+            break;
+        case 'W':
+            warn_on_missing_variants = false;
             break;
         case 'e':
             parse_only = true;
@@ -502,6 +513,13 @@ int main_index(int argc, char** argv) {
             cerr << "Built base XG index" << endl;
         }
     }
+
+#ifdef debug
+    cerr << "Alt paths:" << endl;
+    for (auto& kv : alt_paths) {
+        cerr << kv.first << ": " << kv.second.mapping_size() << " entries" << endl;
+    }
+#endif
 
     // Generate threads
     if (index_haplotypes || index_paths || index_gam) {
@@ -731,7 +749,8 @@ int main_index(int argc, char** argv) {
                                  << var.sequenceName << ":" << var.position << endl;
                             continue;
                         }
-                    } else { // Try using alt paths instead.
+                    } else {
+                        // Try using alt paths instead.
                         bool found = false;
                         for (size_t alt_index = 1; alt_index < var.alleles.size(); alt_index++) {
                             std::string alt_path_name = "_alt_" + var_name + "_" + to_string(alt_index);
@@ -743,6 +762,10 @@ int main_index(int argc, char** argv) {
                                 for (auto node : pred_nodes) {
                                     size_t pred_pos = variants.firstOccurrence(node);
                                     if (pred_pos != variants.invalid_position()) {
+#ifdef debug
+                                        cerr << "Found predecessor node " << gbwt::Node::id(node) << " " << gbwt::Node::is_reverse(node)
+                                            << " occurring at valid pos " << pred_pos << endl;
+#endif
                                         candidate_pos = std::max(candidate_pos, pred_pos + 1);
                                         candidate_found = true;
                                         found = true;
@@ -757,9 +780,16 @@ int main_index(int argc, char** argv) {
                             }
                         }
                         if (!found) {
-                            cerr << "warning: [vg index] Alt and ref paths for " << var_name
-                                 << " at " << var.sequenceName << ":" << var.position
-                                 << " missing/empty! Was the variant skipped during construction?" << endl;
+                            // This variant from the VCF is just not in the graph
+
+                            if (warn_on_missing_variants) {
+                                // The user might not know it. Warn them in case they mixed up their VCFs.
+                                cerr << "warning: [vg index] Alt and ref paths for " << var_name
+                                     << " at " << var.sequenceName << ":" << var.position
+                                     << " missing/empty! Was the variant skipped during construction?" << endl;
+                            }
+
+                            // Skip this variant and move on to the next as if it never appeared.
                             continue;
                         }
                     }
