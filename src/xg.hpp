@@ -213,7 +213,7 @@ public:
     ////////////////////////////////////////////////////////////////////////////
     
     /// Look up the handle for the node with the given ID in the given orientation
-    virtual handle_t get_handle(const id_t& node_id, bool is_reverse) const;
+    virtual handle_t get_handle(const id_t& node_id, bool is_reverse = false) const;
     // Copy over the visit version which would otherwise be shadowed.
     using HandleGraph::get_handle;
     /// Get the ID from a handle
@@ -291,7 +291,7 @@ public:
     
     // use_steps flag toggles whether dist refers to steps or length in base pairs
     void neighborhood(int64_t id, size_t dist, Graph& g, bool use_steps = true) const;
-    void for_path_range(const string& name, int64_t start, int64_t stop, function<void(int64_t node_id)> lambda, bool is_rev = false) const;
+    void for_path_range(const string& name, int64_t start, int64_t stop, function<void(int64_t node_id, bool rev)> lambda, bool is_rev = false) const;
     void get_path_range(const string& name, int64_t start, int64_t stop, Graph& g, bool is_rev = false) const;
     // basic method to query regions of the graph
     // add_paths flag allows turning off the (potentially costly, and thread-locking) addition of paths
