@@ -866,6 +866,7 @@ void MinimizerMapper::chain_extended_seeds(const Alignment& aln, const vector<Ga
                 Alignment before_alignment;
                 before_alignment.set_sequence(before_sequence);
                 // TODO: pre-make the topological order
+                
 #ifdef debug
                 cerr << "Align " << pb2json(before_alignment) << " pinned right vs:" << endl;
                 subgraph.for_each_handle([&](const handle_t& here) {
@@ -877,23 +878,10 @@ void MinimizerMapper::chain_extended_seeds(const Alignment& aln, const vector<Ga
                         cerr << "\t-> " << subgraph.get_id(there) << " (" << subgraph.get_sequence(there) << ")" << endl;
                     });
                 });
-                cerr << "Path: " << pb2json(path) << endl;
 #endif
 
                 // Align, accounting for full length bonus
-                if (use_xdrop_for_tails) {
-#ifdef debug
-                    Alignment clone = before_alignment;
-                    get_regular_aligner()->align_pinned(clone, subgraph, false);
-#endif
-                    get_regular_aligner()->get_xdrop()->align_pinned(before_alignment, subgraph, false);
-#ifdef debug
-                    cerr << "Xdrop: " << pb2json(before_alignment) << endl;
-                    cerr << "Normal: " << pb2json(clone) << endl;
-#endif
-                } else {
-                    get_regular_aligner()->align_pinned(before_alignment, subgraph, false);
-                }
+                get_regular_aligner()->align_pinned(before_alignment, subgraph, false);
                 
                 // Record size of DP matrix filled
                 tail_dp_areas.push_back(before_sequence.size() * path_from_length(path));
@@ -904,7 +892,7 @@ void MinimizerMapper::chain_extended_seeds(const Alignment& aln, const vector<Ga
                     best_score = before_alignment.score();
                     
 #ifdef debug
-                    cerr << "New best alignment against: " << pb2json(path) << " is " << pb2json(best_path) << " score " << best_score << endl;
+                    cerr << "New best alignment against: " << pb2json(path) << " is " << pb2json(best_path) << endl;
 #endif
                 }
             }
@@ -1020,23 +1008,9 @@ void MinimizerMapper::chain_extended_seeds(const Alignment& aln, const vector<Ga
                                     cerr << "\t-> " << subgraph.get_id(there) << " (" << subgraph.get_sequence(there) << ")" << endl;
                                 });
                             });
-                            cerr << "Path: " << pb2json(path) << endl;
 #endif
 
-                            // Align, accounting for full length bonus
-                            if (use_xdrop_for_tails) {
-#ifdef debug
-                                Alignment clone = after_alignment;
-                                get_regular_aligner()->align_pinned(clone, subgraph, true);
-#endif
-                                get_regular_aligner()->get_xdrop()->align_pinned(after_alignment, subgraph, true);
-#ifdef debug
-                                cerr << "Xdrop: " << pb2json(after_alignment) << endl;
-                                cerr << "Normal: " << pb2json(clone) << endl;
-#endif
-                            } else {
-                                get_regular_aligner()->align_pinned(after_alignment, subgraph, true);
-                            }
+                            get_regular_aligner()->align_pinned(after_alignment, subgraph, true);
                             
                             // Record size of DP matrix filled
                             tail_dp_areas.push_back(trailing_sequence.size() * path_from_length(path));
@@ -1186,6 +1160,7 @@ void MinimizerMapper::chain_extended_seeds(const Alignment& aln, const vector<Ga
         cerr << "error[vg::MinimizerMapper]: invalid MultipathAlignment generated: " << pb2json(mp) << endl;
         exit(1);
     }
+    
     
     // Linearize into the out alignment, copying path, score, and also sequence and other read metadata
     optimal_alignment(mp, out, true);
@@ -1548,7 +1523,7 @@ void MinimizerMapper::explore_gbwt(const Position& from, size_t walk_distance,
     }
    
 #ifdef debug   
-    cerr << "Starting traversal from " << pb2json(from) << endl;
+    cerr << "Starting traversal with " << pb2json(path_to_end) << " from " << pb2json(from) << endl;
 #endif
     
     // Glom these together into a traversal state and queue it up.
